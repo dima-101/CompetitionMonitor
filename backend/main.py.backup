@@ -1,0 +1,505 @@
+import os
+import json
+import sqlite3
+import logging
+import requests
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from dotenv import load_dotenv
+import uvicorn
+
+# Перенесенная Pydantic модель для совместимости (ПЕРЕМЕЩЕНА В НАЧАЛО)
+class CompetitorAnalysis(BaseModel):
+    strengths: list = []
+    weaknesses: list = []
+    unique_offers: list = []
+    opportunities: list = []
+    recommendations: list = []
+    summary: str = ""
+
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Import scoring service
+try:
+    from backend.services.scoreservice import DesignToolsScoringService
+    SCORING_ENABLED = True
+except ImportError as e:
+    SCORING_ENABLED = False
+    logger.warning(f"⚠️ Scoring service недоступен: {e}")
+
+API_KEY = os.getenv("PERPLEXITY_API_KEY")
+PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
+DB_PATH = "analyses.db"
+STATIC_DIR = Path(__file__).parent / "static"
+
+app = FastAPI(title="CompetitionMonitor MVP", version="1.0")
+
+# Initialize scorer if available
+scorer = DesignToolsScoringService() if SCORING_ENABLED else None
+
+# Регистрируем шрифт с поддержкой Cyrillic при запуске
+try:
+    pdfmetrics.registerFont(TTFont('DejaVu', 'DejaVuSans.ttf'))
+    DEFAULT_FONT = 'DejaVu'
+    logger.info("✅ Шрифт DejaVuSans загружен")
+except Exception as e:
+    DEFAULT_FONT = 'Helvetica'
+    logger.warning(f"⚠️ DejaVuSans не найден, используется {DEFAULT_FONT}: {e}")
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS analyses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            competitor_name TEXT NOT NULL,
+            analysis_text TEXT NOT NULL,
+            image_base64 TEXT,
+            analysis_result TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+    logger.info("✅ База данных инициализирована")
+
+init_db()
+
+class AnalysisRequest(BaseModel):
+    text: str
+    competitor_name: str = "Конкурент"
+    image: Optional[str] = None
+
+class CompareRequest(BaseModel):
+    analysis_ids: list[int]
+
+def analyze_with_perplexity(text: str, image_base64: Optional[str] = None) -> dict:
+    logger.info("🔑 API ключ: " + API_KEY[:20] + "...")
+    
+    content = [
+        {
+            "type": "text",
+            "text": f"""Проанализируй информацию о конкуренте. Дай SWOT анализ.
+
+Информация:
+{text}
+
+Верни ТОЛЬКО валидный JSON без markdown:
+{{
+    "strengths": "Сильные стороны",
+    "weaknesses": "Слабые стороны",
+    "opportunities": "Возможности",
+    "threats": "Угрозы",
+    "recommendations": "Рекомендации",
+    "image_insights": "Insights если есть фото"
+}}"""
+        }
+    ]
+    
+    if image_base64:
+        content.append({
+            "type": "image",
+            "image": image_base64
+        })
+    
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": "sonar",
+        "messages": [{"role": "user", "content": content}],
+        "temperature": 0.7,
+        "max_tokens": 2000
+    }
+    
+    logger.info("📤 Отправляю в Perplexity...")
+    
+    try:
+        response = requests.post(PERPLEXITY_URL, headers=headers, json=payload, verify=False)
+        logger.info(f"📥 Status: {response.status_code}")
+        
+        if response.status_code != 200:
+            logger.error(f"❌ Ошибка: {response.text}")
+            return {"error": f"API error: {response.status_code}"}
+        
+        data = response.json()
+        response_text = data["choices"][0]["message"]["content"]
+        
+        try:
+            analysis = json.loads(response_text)
+            logger.info("✨ JSON распарсен!")
+            return analysis
+        except json.JSONDecodeError:
+            import re
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                analysis = json.loads(json_match.group())
+                logger.info("✨ JSON извлечен!")
+                return analysis
+            return {"error": "Invalid JSON"}
+    
+    except Exception as e:
+        logger.error(f"❌ Ошибка: {str(e)}")
+        return {"error": str(e)}
+
+def save_analysis(competitor_name: str, text: str, analysis: dict, image_base64: Optional[str] = None, scores: Optional[dict] = None) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Merge analysis with scores if available
+    full_data = analysis.copy()
+    if scores:
+        full_data["scores"] = scores
+    
+    cursor.execute('''
+        INSERT INTO analyses (competitor_name, analysis_text, image_base64, analysis_result)
+        VALUES (?, ?, ?, ?)
+    ''', (competitor_name, text, image_base64, json.dumps(full_data)))
+    conn.commit()
+    analysis_id = cursor.lastrowid
+    conn.close()
+    logger.info(f"💾 Сохранено ID: {analysis_id}")
+    return analysis_id
+
+def generate_pdf(analysis_id: int, competitor_name: str) -> str:
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT analysis_result FROM analyses WHERE id = ?', (analysis_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        return None
+    
+    analysis = json.loads(row[0])
+    pdf_path = f"analysis_{analysis_id}.pdf"
+    
+    doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        textColor=colors.HexColor("#667eea"),
+        spaceAfter=30,
+        alignment=1,
+        fontName=DEFAULT_FONT
+    )
+    
+    elements.append(Paragraph(f"📊 Анализ: {competitor_name}", title_style))
+    elements.append(Spacer(1, 0.3*inch))
+    
+    date_style = ParagraphStyle(
+        'DateStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.grey,
+        alignment=2,
+        fontName=DEFAULT_FONT
+    )
+    elements.append(Paragraph(f"Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}", date_style))
+    elements.append(Spacer(1, 0.2*inch))
+    
+    sections = [
+        ("💪 Сильные стороны", "strengths"),
+        ("⚠️ Слабые стороны", "weaknesses"),
+        ("🎯 Возможности", "opportunities"),
+        ("🚨 Угрозы", "threats"),
+    ]
+    
+    for title, key in sections:
+        if key in analysis and analysis[key]:
+            heading = ParagraphStyle(
+                f'Heading_{key}',
+                parent=styles['Heading2'],
+                fontSize=14,
+                textColor=colors.HexColor("#333"),
+                spaceAfter=10,
+                spaceBefore=10,
+                fontName=DEFAULT_FONT
+            )
+            elements.append(Paragraph(title, heading))
+            
+            text_style = ParagraphStyle(
+                f'Text_{key}',
+                parent=styles['Normal'],
+                fontSize=11,
+                textColor=colors.HexColor("#555"),
+                spaceAfter=15,
+                fontName=DEFAULT_FONT
+            )
+            elements.append(Paragraph(analysis[key], text_style))
+    
+    # Add scores if available
+    if "scores" in analysis:
+        scores = analysis["scores"]
+        heading = ParagraphStyle(
+            'ScoresHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor("#667eea"),
+            spaceAfter=10,
+            spaceBefore=10,
+            fontName=DEFAULT_FONT
+        )
+        elements.append(Paragraph("📈 Оценки (для AI Design Tools)", heading))
+        
+        scores_text = f"""
+Design Score: {scores.get('design_score', 'N/A')}/10
+Animation Potential: {scores.get('animation_potential', 'N/A')}/10
+Feature Richness: {scores.get('feature_richness', 'N/A')}/10
+UX Rating: {scores.get('ux_rating', 'N/A')}/10
+Overall Threat Level: {scores.get('overall_threat_level', 'N/A')}
+        """
+        
+        text_style = ParagraphStyle(
+            'ScoresText',
+            parent=styles['Normal'],
+            fontSize=11,
+            textColor=colors.HexColor("#555"),
+            spaceAfter=15,
+            fontName=DEFAULT_FONT
+        )
+        elements.append(Paragraph(scores_text, text_style))
+    
+    if "recommendations" in analysis and analysis["recommendations"]:
+        heading = ParagraphStyle(
+            'RecommendationsHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor("#667eea"),
+            spaceAfter=10,
+            spaceBefore=10,
+            fontName=DEFAULT_FONT
+        )
+        elements.append(Paragraph("📋 Рекомендации", heading))
+        
+        text_style = ParagraphStyle(
+            'RecommendationsText',
+            parent=styles['Normal'],
+            fontSize=11,
+            textColor=colors.HexColor("#555"),
+            spaceAfter=15,
+            fontName=DEFAULT_FONT
+        )
+        elements.append(Paragraph(analysis["recommendations"], text_style))
+    
+    doc.build(elements)
+    logger.info(f"📄 PDF: {pdf_path}")
+    return pdf_path
+
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    html_path = STATIC_DIR / "index.html"
+    if html_path.exists():
+        html_content = open(html_path, encoding='utf-8').read()
+        html_content = html_content.replace(
+            '</head>',
+            '<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">\n    <meta http-equiv="pragma" content="no-cache">\n    <meta http-equiv="expires" content="0">\n    </head>'
+        )
+        return html_content
+    return "<h1>CompetitionMonitor MVP готов!</h1><p>Frontend не найден</p>"
+
+@app.post("/analyzetext")
+async def analyze_text(request: AnalysisRequest):
+    try:
+        logger.info(f"🔍 Анализирую: {request.competitor_name}")
+        
+        analysis = analyze_with_perplexity(request.text, request.image)
+        
+        if "error" in analysis:
+            return {"success": False, "analysis": analysis}
+        
+        analysis_id = save_analysis(
+            request.competitor_name,
+            request.text,
+            analysis,
+            request.image
+        )
+        
+        return {
+            "success": True,
+            "analysis": analysis,
+            "analysis_id": analysis_id
+        }
+    
+    except Exception as e:
+        logger.error(f"❌ Ошибка: {str(e)}")
+        return {"success": False, "analysis": {"error": str(e)}}
+
+@app.post("/analyzetext-scored")
+async def analyze_text_scored(request: AnalysisRequest):
+    """Анализ текста с scoring для AI Design Tools"""
+    try:
+        logger.info(f"🎨 Анализирую с scoring: {request.competitor_name}")
+        
+        if not SCORING_ENABLED:
+            return {"success": False, "error": "Scoring service not available"}
+        
+        # Анализируем текст
+        analysis = analyze_with_perplexity(request.text, request.image)
+        
+        if "error" in analysis:
+            return {"success": False, "analysis": analysis}
+        
+        # Скорим результат
+        scores = scorer.score_competitor_text(
+            CompetitorAnalysis(
+                strengths=analysis.get("strengths", []) if isinstance(analysis.get("strengths"), list) else [analysis.get("strengths", "")],
+                weaknesses=analysis.get("weaknesses", []) if isinstance(analysis.get("weaknesses"), list) else [analysis.get("weaknesses", "")],
+                unique_offers=analysis.get("unique_offers", []),
+                opportunities=analysis.get("opportunities", []) if isinstance(analysis.get("opportunities"), list) else [analysis.get("opportunities", "")],
+                recommendations=analysis.get("recommendations", []) if isinstance(analysis.get("recommendations"), list) else [analysis.get("recommendations", "")],
+                summary=analysis.get("summary", "")
+            )
+        )
+        
+        analysis["scores"] = scores
+        
+        analysis_id = save_analysis(
+            request.competitor_name,
+            request.text,
+            analysis,
+            request.image,
+            scores
+        )
+        
+        return {
+            "success": True,
+            "analysis": analysis,
+            "scores": scores,
+            "analysis_id": analysis_id
+        }
+    
+    except Exception as e:
+        logger.error(f"❌ Ошибка: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/history")
+async def get_history():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT id, competitor_name, created_at FROM analyses ORDER BY created_at DESC')
+    rows = cursor.fetchall()
+    conn.close()
+    
+    history = [
+        {
+            "id": row[0],
+            "competitor_name": row[1],
+            "created_at": row[2]
+        }
+        for row in rows
+    ]
+    
+    return {"success": True, "history": history}
+
+@app.get("/analysis/{analysis_id}")
+async def get_analysis(analysis_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT competitor_name, analysis_result FROM analyses WHERE id = ?', (analysis_id,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    return {
+        "success": True,
+        "competitor_name": row[0],
+        "analysis": json.loads(row[1])
+    }
+
+@app.get("/export-pdf/{analysis_id}")
+async def export_pdf(analysis_id: int):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute('SELECT competitor_name FROM analyses WHERE id = ?', (analysis_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Analysis not found")
+        
+        pdf_path = generate_pdf(analysis_id, row[0])
+        return FileResponse(pdf_path, filename=f"analysis_{analysis_id}.pdf")
+    
+    except Exception as e:
+        logger.error(f"❌ Ошибка PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/compare")
+async def compare_competitors(request: CompareRequest):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        competitors = []
+        for analysis_id in request.analysis_ids:
+            cursor.execute('SELECT competitor_name, analysis_result FROM analyses WHERE id = ?', (analysis_id,))
+            row = cursor.fetchone()
+            if row:
+                competitors.append({
+                    "name": row[0],
+                    "analysis": json.loads(row[1])
+                })
+        
+        conn.close()
+        
+        if not competitors:
+            raise HTTPException(status_code=404, detail="No analyses found")
+        
+        return {"success": True, "competitors": competitors}
+    
+    except Exception as e:
+        logger.error(f"❌ Ошибка: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/health")
+async def health():
+    return {"status": "✅ API работает", "db": "✅ БД доступна", "scoring": "✅ Включен" if SCORING_ENABLED else "❌ Отключен"}
+
+if __name__ == "__main__":
+    import sys
+    
+    # Выводим логи в STDOUT явно
+    print(f"✅ API ключ: {API_KEY[:20]}...", file=sys.stdout, flush=True)
+    print("🚀 Backend запускается...", file=sys.stdout, flush=True)
+    print("📊 Endpoints: / /analyzetext /analyzetext-scored /history /analysis/{id} /export-pdf/{id} /compare", file=sys.stdout, flush=True)
+    print("📷 Поддержка: Text + Images", file=sys.stdout, flush=True)
+    print(f"📝 Шрифт для PDF: {DEFAULT_FONT}", file=sys.stdout, flush=True)
+    print(f"🎨 Scoring для Design Tools: {'✅ ВКЛЮЧЕН' if SCORING_ENABLED else '❌ ОТКЛЮЧЕН'}", file=sys.stdout, flush=True)
+    print(f"📍 SCORING_ENABLED = {SCORING_ENABLED}", file=sys.stdout, flush=True)
+    print(f"📍 scorer = {scorer}", file=sys.stdout, flush=True)
+    
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        log_level="info"
+    )

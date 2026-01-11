@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CompetitionMonitor 🚀</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 40px;
+        }
+
+        .form-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+            font-size: 0.95em;
+        }
+
+        .form-group textarea {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 0.95em;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .results-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .result-card h3 {
+            color: #667eea;
+            font-size: 1em;
+            margin-bottom: 8px;
+        }
+
+        .result-card p {
+            color: #555;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        .result-list {
+            list-style: none;
+            margin: 10px 0;
+        }
+
+        .result-list li {
+            padding: 5px 0;
+            padding-left: 20px;
+            position: relative;
+            color: #555;
+            font-size: 0.9em;
+        }
+
+        .result-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .json-output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8em;
+            overflow-x: auto;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #c62828;
+        }
+
+        .success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #2e7d32;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 CompetitionMonitor</h1>
+            <p>Анализируй конкурентов за 10 секунд</p>
+        </div>
+
+        <div class="content">
+            <!-- ФОРМА -->
+            <div class="form-section">
+                <div class="form-group">
+                    <label for="competitorText">📝 Опишите конкурента:</label>
+                    <textarea 
+                        id="competitorText" 
+                        placeholder="Пример: Конкурент 'WebStudioPro' предлагает лендинги за 35k рублей, сроки 10 дней, Tilda с готовыми шаблонами. Цель - малый бизнес."
+                    ></textarea>
+                </div>
+
+                <button class="btn" id="analyzeBtn" onclick="analyzeCompetitor()">
+                    🔍 Анализировать
+                </button>
+            </div>
+
+            <!-- РЕЗУЛЬТАТЫ -->
+            <div class="results-section" id="resultsSection">
+                <p style="color: #999; text-align: center;">Результаты появятся здесь...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function analyzeCompetitor() {
+            const text = document.getElementById('competitorText').value.trim();
+            const resultsSection = document.getElementById('resultsSection');
+            const btn = document.getElementById('analyzeBtn');
+
+            if (!text) {
+                alert('❌ Пожалуйста, опишите конкурента!');
+                return;
+            }
+
+            // Блокируем кнопку
+            btn.disabled = true;
+            btn.textContent = '⏳ Анализирую...';
+
+            try {
+                // Отправляем запрос на Backend
+                const response = await fetch('http://localhost:8000/analyzetext', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Ошибка: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                // Отображаем результаты
+                displayResults(data);
+
+            } catch (error) {
+                resultsSection.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Ошибка:</strong> ${error.message}
+                        <p style="margin-top: 10px; font-size: 0.9em;">
+                            Убедись, что Backend работает на http://localhost:8000
+                        </p>
+                    </div>
+                `;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Анализировать';
+            }
+        }
+
+        function displayResults(data) {
+            const resultsSection = document.getElementById('resultsSection');
+
+            if (!data.success) {
+                resultsSection.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Ошибка анализа:</strong> ${data.analysis?.summary || 'Неизвестная ошибка'}
+                    </div>
+                `;
+                return;
+            }
+
+            const analysis = data.analysis;
+
+            let html = '<div class="success"><strong>✅ Анализ успешно завершён!</strong></div>';
+
+            // Сильные стороны
+            if (analysis.strengths && analysis.strengths.length > 0) {
+                html += `
+                    <div class="result-card">
+                        <h3>💪 Сильные стороны</h3>
+                        <ul class="result-list">
+                            ${analysis.strengths.map(s => `<li>${s}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // Слабые места
+            if (analysis.weaknesses && analysis.weaknesses.length > 0) {
+                html += `
+                    <div class="result-card">
+                        <h3>⚠️ Слабые места</h3>
+                        <ul class="result-list">
+                            ${analysis.weaknesses.map(w => `<li>${w}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // Уникальные предложения
+            if (analysis.unique_offers && analysis.unique_offers.length > 0) {
+                html += `
+                    <div class="result-card">
+                        <h3>⭐ Уникальные предложения</h3>
+                        <ul class="result-list">
+                            ${analysis.unique_offers.map(u => `<li>${u}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // Возможности
+            if (analysis.opportunities && analysis.opportunities.length > 0) {
+                html += `
+                    <div class="result-card">
+                        <h3>🎯 Возможности</h3>
+                        <ul class="result-list">
+                            ${analysis.opportunities.slice(0, 3).map(o => `<li>${o}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // Рекомендации
+            if (analysis.recommendations && analysis.recommendations.length > 0) {
+                html += `
+                    <div class="result-card">
+                        <h3>💡 Рекомендации</h3>
+                        <ul class="result-list">
+                            ${analysis.recommendations.slice(0, 3).map(r => `<li>${r}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            // Резюме
+            if (analysis.summary) {
+                html += `
+                    <div class="result-card">
+                        <h3>📋 Резюме</h3>
+                        <p>${analysis.summary}</p>
+                    </div>
+                `;
+            }
+
+            // JSON вывод
+            html += `
+                <details>
+                    <summary style="cursor: pointer; color: #667eea; font-weight: 600; margin-top: 10px;">
+                        📊 Полный JSON (нажми для раскрытия)
+                    </summary>
+                    <div class="json-output">
+                        ${JSON.stringify(data, null, 2).replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                    </div>
+                </details>
+            `;
+
+            resultsSection.innerHTML = html;
+        }
+
+        // Отправляем форму по Enter
+        document.getElementById('competitorText').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                analyzeCompetitor();
+            }
+        });
+    </script>
+</body>
+</html>
