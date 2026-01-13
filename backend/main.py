@@ -1,40 +1,35 @@
 import os
-import asyncio
+import io
+import base64
+import logging
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, Form
 from openai import OpenAI
 from PIL import Image
-import io
-import base64
-import logging
-from typing import Optional
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# ================= Настройка окружения и логирования =================
 
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# ================= Инициализация FastAPI и OpenAI клиента ============
+
 app = FastAPI(title="Мультимодальный Анализатор ДЗ Модуль 4")
 
-# ===== МУЛЬТИМОДАЛКА ДЗ НАЙДЕН app =====
-from fastapi import UploadFile, File, Form
-from openai import OpenAI
-from PIL import Image
-import io, base64, os
-from dotenv import load_dotenv
-
-load
-
-# OpenAI Proxy клиент
 client = OpenAI(
     api_key=os.getenv("OPENAI_PROXY_API_KEY"),
     base_url=os.getenv("OPENAI_PROXY_BASE_URL", "https://api.openai-proxy.ru/v1")
 )
 
+# ================= Маршруты ==========================================
+
 @app.get("/")
 async def root():
     return {"message": "Мультимодальный API для ДЗ готов! POST /analyze_image/"}
+
 
 @app.post("/analyze_image/")
 async def analyze_image(
@@ -45,12 +40,12 @@ async def analyze_image(
         # 1. Читаем файл
         contents = await file.read()
         image = Image.open(io.BytesIO(contents))
-        
-        # 2. Base64 для OpenAI Vision
+
+        # 2. Перекодируем в PNG и Base64 для Vision
         buffered = io.BytesIO()
         image.save(buffered, format="PNG")
-        img_b64 = base64.b64encode(buffered.getvalue()).decode()
-        
+        img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+
         # 3. Запрос к GPT-4o-mini (мультимодалка)
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -71,22 +66,23 @@ async def analyze_image(
             max_tokens=1000,
             temperature=0.3
         )
-        
+
         result = {
             "status": "success",
             "filename": file.filename,
             "analysis": response.choices[0].message.content,
             "model": "gpt-4o-mini-vision"
         }
-        
-        logger.info(f"✅ Анализ успешен: {file.filename}")
+
+        logger.info(f"Анализ успешен: {file.filename}")
         return result
-        
+
     except Exception as e:
-        logger.error(f"❌ Ошибка анализа: {str(e)}")
+        logger.error(f"Ошибка анализа: {str(e)}")
         return {"status": "error", "message": str(e)}
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
 
+    uvicorn.run(app, host="127.0.0.1", port=8000)
