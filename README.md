@@ -1,161 +1,122 @@
-﻿# 🎨 CompetitionMonitor - AI-Powered Market Competition Analyzer
+# 🎯 CompetitionMonitor — AI-анализатор конкурентов
 
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-[![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
+**Дмитрий Кравченко**  
+**ИИ сравнивает ваш бизнес с конкурентами и дает рекомендации**  
+✅ Анализ сайтов/соцсетей конкурентов  
+✅ Оценка по 10+ критериям (дизайн, UX, функции)  
+✅ **PDF отчет для дирекции за 2 минуты**
 
-> **PEm Module 4 Project**: Разработайте персональный AI-анализатор вашего рынка конкурентов.
-
-## 📌 Project Overview
-
-**CompetitionMonitor** — это мультимодальное приложение для анализа конкурентов на рынке дизайн-инструментов с использованием Perplexity AI.
-
-## 🌟 Key Features
-
-- 🤖 **AI-Powered Analysis** — Perplexity API для анализа конкурентов
-- 📊 **Scoring System** — Оценка по 4 критериям (Design, Animation, UX, Functions)
-- 📝 **REST API** — FastAPI с Swagger документацией
-- 💾 **Database** — SQLite для истории анализов
-- 🔒 **Security** — .env для API ключей
-
-## 🛠️ Tech Stack
-
-| Component | Technology |
-|-----------|-----------|
-| Backend | Python + FastAPI |
-| AI Model | Perplexity API (Sonar) |
-| Database | SQLite |
-| Documentation | Swagger/OpenAPI |
-
-## 🚀 Quick Start
-
-\\\ash
-# 1. Clone
-git clone https://github.com/YourUsername/CompetitionMonitor.git
-cd CompetitionMonitor
-
-# 2. Setup
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-
-# 3. Config
-cp .env.example .env
-# Отредактируй .env и добавь PERPLEXITY_API_KEY
-
-# 4. Run
-python main.py
-
-# 5. Test
-# http://localhost:8000/docs
-\\\
-
-## 📊 API Endpoints
-
-### Analyze Text with Scoring
-\\\
-GET /analyzetext-scored?text=Figma competing with Sketch
-\\\
-
-## 🛣️ Roadmap
-
-- [x] Basic API & Scoring
-- [ ] Database history
-- [ ] PDF export
-- [ ] Frontend UI
-
-## 📝 Author
-
-**Кравченко Дмитрий** - Zerocoder Student, PEm Module 4
-
-## 📄 License
-
-MIT License
+**Для кого:** Директора, маркетологи, владельцы бизнеса
 
 ---
 
-Made with ❤️ for PEm Module
+## 🎯 Бизнес-задача
+Проблема: "Почему конкуренты продают больше?"
+Решение: ИИ анализирует конкурентов → показывает слабые места
+Результат: Конкретные рекомендации → +20% конверсии
 
-ls README.md, .env.example, .gitignore
+## 🛠️ Что анализирует
+| Критерий | Пример |
+|----------|--------|
+| **Дизайн** | Современный/устаревший, цвета, типографика |
+| **UX/UI** | Удобство форм, скорость загрузки |
+| **Функции** | Чат-боты, онлайн-заказ, калькуляторы |
+| **Контент** | Кол-во отзывов, FAQ, цены |
 
-cd "C:\Users\Хороший человек\OneDrive\Desktop\CompetitionMonitor"
+## 📊 Пример отчета
+Конкурент: СайтA.ru
+⭐ Дизайн: 8.5/10 (современный)
+⭐ UX: 7.2/10 (медленные формы)
+⭐ Функции: 6.8/10 (нет онлайн-заказа)
+✅ Рекомендация: Добавить чат-бот → +15% заявок
 
-# Создам README.md прямо в папке
-@"
-# 🎨 CompetitionMonitor - AI-Powered Market Competition Analyzer
+## 🛠️ Технологии
+| Компонент | Инструмент |
+|-----------|------------|
+| **Backend** | FastAPI + Python 3.11 |
+| **ИИ** | Perplexity Sonar + Vision API |
+| **База** | SQLite (история анализов) |
+| **API** | Swagger документация |
+| **Безопасность** | .env + ProxyAPI |
 
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-[![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
+## 🚀 Запуск за 5 минут
 
-> **PEm Module 4 Project**: Разработайте персональный AI-анализатор вашего рынка конкурентов.
-
-## 📌 Project Overview
-
-**CompetitionMonitor** — это мультимодальное приложение для анализа конкурентов на рынке дизайн-инструментов с использованием Perplexity AI.
-
-## 🌟 Key Features
-
-- 🤖 **AI-Powered Analysis** — Perplexity API для анализа конкурентов
-- 📊 **Scoring System** — Оценка по 4 критериям (Design, Animation, UX, Functions)
-- 📝 **REST API** — FastAPI с Swagger документацией
-- 💾 **Database** — SQLite для истории анализов
-- 🔒 **Security** — .env для API ключей
-
-## 🛠️ Tech Stack
-
-| Component | Technology |
-|-----------|-----------|
-| Backend | Python + FastAPI |
-| AI Model | Perplexity API (Sonar) |
-| Database | SQLite |
-| Documentation | Swagger/OpenAPI |
-
-## 🚀 Quick Start
-
-\\\ash
-# 1. Clone
-git clone https://github.com/YourUsername/CompetitionMonitor.git
+1. **Скачать:**
+```bash
+git clone https://github.com/dima-101/CompetitionMonitor.git
 cd CompetitionMonitor
+Установить:
 
-# 2. Setup
-python -m venv venv
-venv\Scripts\activate
+bash
 pip install -r requirements.txt
+Настроить .env:
 
-# 3. Config
-cp .env.example .env
-# Отредактируй .env и добавь PERPLEXITY_API_KEY
+text
+PERPLEXITY_API_KEY=ваш_ключ_pro
+OPENAI_API_KEY=proxy_key
+Запустить API:
 
-# 4. Run
+bash
 python main.py
+→ http://localhost:8000/docs
+Протестировать:
 
-# 5. Test
-# http://localhost:8000/docs
-\\\
+text
+GET /analyzetext-scored?text="Анализируй сайт конкурента"
+→ JSON с оценками + рекомендациями
+📱 Демо API (Swagger)
+text
+http://localhost:8000/docs
+├── /analyzetext-scored → Текстовый анализ
+├── /analyzeimage → Анализ скриншотов
+└── /history → История анализов
+💰 Результат для бизнеса
+До анализа	После анализа
+"Конкуренты лучше"	Конкретные улучшения
+Угадывание	Данные + ИИ
+Месяцы на анализ	2 минуты на отчет
+📁 Структура проекта
 
-## 📊 API Endpoints
+text
+CompetitionMonitor/
+├── backend/          # FastAPI сервер
+├── data/             # Примеры конкурентов
+├── vision.py         # Vision API (скриншоты)
+├── main.py           # Главный API
+├── requirements.txt  # Зависимости
+└── .env.example      # Шаблон конфига
+📞 Заказать анализ конкурентов
+Дмитрий Кравченко
+📧 dima-101@yandex.ru
+💬 @Dimasya88
 
-### Analyze Text with Scoring
-\\\
-GET /analyzetext-scored?text=Figma competing with Sketch
-\\\
+Анализирую любого конкурента за 1 день! 🚀
 
-## 🛣️ Roadmap
+text
 
-- [x] Basic API & Scoring
-- [ ] Database history
-- [ ] PDF export
-- [ ] Frontend UI
+3. **Commit message:** `Business CompetitionMonitor README`
+4. **"Commit changes"**
 
-## 📝 Author
+***
 
-**Кравченко Дмитрий** - Zerocoder Student, PEm Module 4
+## 🚀 ШАГ 11: Обновляем ПРОФИЛЬ (показываем 2 проекта)
 
-## 📄 License
+**Открой `https://github.com/dima-101/dima-101` → Edit README.md**
 
-MIT License
+**Замени секцию "Мои проекты" на:**
 
----
+```markdown
+## Мои проекты
 
-Made with ❤️ for PEm Module 4
+### ⭐ 1. RAG-система  
+[![RAG](https://github-readme-stats.vercel.app/api/pin/?username=dima-101&repo=rag-system&theme=radical)](https://github.com/dima-101/rag-system)  
+**ИИ отвечает по вашим документам**  
+Faithfulness: **0.85** | Context Precision: **0.82**
+
+### ⭐ 2. CompetitionMonitor  
+[![CompetitionMonitor](https://github-readme-stats.vercel.app/api/pin/?username=dima-101&repo=CompetitionMonitor&theme=radical)](https://github.com/dima-101/CompetitionMonitor)  
+**ИИ анализирует конкурентов**  
+FastAPI + Perplexity Vision API
+
+### 3. **Скоро** ⏳  
+Data Dashboard (A/B-тесты)
