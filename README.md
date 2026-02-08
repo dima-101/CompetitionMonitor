@@ -41,6 +41,19 @@
 
 ## 🚀 Запуск за 5 минут
 
+## 📱 Демо работы системы
+
+| Swagger API | Оценка конкурентов |
+|-------------|-------------------|
+
+![Пример работы ассистента 2](screenshot-dialog-1.jpg)
+![Пример работы ассистента 3](screenshot-dialog-2.jpg)
+
+
+**Swagger:** `http://localhost:8000/docs` — все endpoints  
+**Результат:** JSON с оценками + рекомендации для бизнеса
+
+
 1. **Скачать:**
 ```bash
 git clone https://github.com/dima-101/CompetitionMonitor.git
@@ -92,31 +105,4 @@ CompetitionMonitor/
 
 Анализирую любого конкурента за 1 день! 🚀
 
-text
 
-3. **Commit message:** `Business CompetitionMonitor README`
-4. **"Commit changes"**
-
-***
-
-## 🚀 ШАГ 11: Обновляем ПРОФИЛЬ (показываем 2 проекта)
-
-**Открой `https://github.com/dima-101/dima-101` → Edit README.md**
-
-**Замени секцию "Мои проекты" на:**
-
-```markdown
-## Мои проекты
-
-### ⭐ 1. RAG-система  
-[![RAG](https://github-readme-stats.vercel.app/api/pin/?username=dima-101&repo=rag-system&theme=radical)](https://github.com/dima-101/rag-system)  
-**ИИ отвечает по вашим документам**  
-Faithfulness: **0.85** | Context Precision: **0.82**
-
-### ⭐ 2. CompetitionMonitor  
-[![CompetitionMonitor](https://github-readme-stats.vercel.app/api/pin/?username=dima-101&repo=CompetitionMonitor&theme=radical)](https://github.com/dima-101/CompetitionMonitor)  
-**ИИ анализирует конкурентов**  
-FastAPI + Perplexity Vision API
-
-### 3. **Скоро** ⏳  
-Data Dashboard (A/B-тесты)
